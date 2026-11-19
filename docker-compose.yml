@@ -1,0 +1,66 @@
+# Coimbatore Ride Pulse - 4-node Hadoop cluster (1 master + 3 workers)
+#   docker compose up -d --build
+x-node: &node
+  build: ./docker
+  image: ride-pulse-hadoop:3.3.6
+  volumes:
+    - ./:/project
+  networks: [hadoop]
+  restart: unless-stopped
+
+services:
+  master:
+    <<: *node
+    container_name: master
+    hostname: master
+    command: ["master"]
+    ports:
+      - "9870:9870"    # HDFS NameNode UI
+      - "8088:8088"    # YARN ResourceManager UI
+      - "19888:19888"  # MapReduce JobHistory UI
+      - "8000:8000"    # Dashboard
+    volumes:
+      - ./:/project
+      - namenode:/hadoop/dfs/name
+      - staging:/staging
+
+  worker1:
+    <<: *node
+    container_name: worker1
+    hostname: worker1
+    command: ["worker"]
+    depends_on: [master]
+    volumes:
+      - ./:/project
+      - dn1:/hadoop/dfs/data
+
+  worker2:
+    <<: *node
+    container_name: worker2
+    hostname: worker2
+    command: ["worker"]
+    depends_on: [master]
+    volumes:
+      - ./:/project
+      - dn2:/hadoop/dfs/data
+
+  worker3:
+    <<: *node
+    container_name: worker3
+    hostname: worker3
+    command: ["worker"]
+    depends_on: [master]
+    volumes:
+      - ./:/project
+      - dn3:/hadoop/dfs/data
+
+networks:
+  hadoop:
+    name: ride-pulse-net
+
+volumes:
+  namenode:
+  staging:
+  dn1:
+  dn2:
+  dn3:

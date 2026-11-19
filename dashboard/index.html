@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coimbatore Ride Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#071120; --bg2:#0A1628; --panel:#0D1B2F; --panel2:#112240; --line:#1A2D49; --line2:#22395B;
+  --text:#E7EEF8; --muted:#8DA2BF; --dim:#5D7290;
+  --cyan:#2BC6F0; --cyan2:#1593C4; --red:#FF4B57; --red2:#C9303C; --amber:#FFB547; --green:#35D39A;
+  --radius:14px; --font:'Inter',system-ui,sans-serif; --display:'Sora','Inter',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+button{font:inherit;color:inherit}
+a{color:var(--cyan)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:84px 1fr;min-height:100vh}
+header{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:0 28px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0A1830,#081325)}
+.brand{display:flex;align-items:center;gap:14px}
+.brand svg{width:40px;height:48px;filter:drop-shadow(0 0 10px rgba(43,198,240,.45))}
+.brand h1{font-family:var(--display);font-size:27px;font-weight:700;margin:0;letter-spacing:-.01em}
+.brand p{margin:2px 0 0;color:var(--cyan);font-size:15px;letter-spacing:.02em}
+.head-right{margin-left:auto;display:flex;gap:12px;align-items:center}
+.pill{display:flex;align-items:center;gap:10px;padding:10px 16px;border:1px solid var(--line2);border-radius:12px;background:rgba(13,27,47,.8);color:var(--muted);font-size:13px;white-space:nowrap}
+.pill b{color:var(--text);font-weight:600}
+.pill.ok{border-color:rgba(53,211,154,.35);background:rgba(53,211,154,.06)}
+.pill.ok b{color:var(--green)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(53,211,154,.6);animation:beat 2.4s infinite}
+.pill.warn{border-color:rgba(255,181,71,.35)} .pill.warn b{color:var(--amber)} .pill.warn .dot{background:var(--amber);animation:none}
+@keyframes beat{0%{box-shadow:0 0 0 0 rgba(53,211,154,.6)}70%{box-shadow:0 0 0 9px rgba(53,211,154,0)}100%{box-shadow:0 0 0 0 rgba(53,211,154,0)}}
+
+nav{border-right:1px solid var(--line);background:var(--bg2);padding:22px 0;display:flex;flex-direction:column}
+nav button{display:flex;align-items:center;gap:16px;width:100%;padding:16px 28px;border:0;background:none;cursor:pointer;color:var(--text);font-size:15.5px;text-align:left;border-left:4px solid transparent}
+nav button svg{width:24px;height:24px;stroke:var(--muted);fill:none;stroke-width:1.8}
+nav button:hover{background:rgba(43,198,240,.05)}
+nav button.on{background:linear-gradient(90deg,rgba(43,198,240,.18),rgba(43,198,240,.03));border-left-color:var(--cyan);color:var(--cyan)}
+nav button.on svg{stroke:var(--cyan)}
+.nav-foot{margin-top:auto;padding:24px 28px;color:var(--dim);font-size:12px;line-height:1.6}
+.nav-foot svg{width:100%;height:auto;opacity:.6;margin-bottom:12px}
+.nav-foot .cap{text-align:center;letter-spacing:.32em;text-transform:uppercase;font-size:10.5px;color:#61758F;line-height:2}
+.nav-foot .cap::after{content:"";display:block;width:40px;height:1px;background:#3A4E68;margin:12px auto 0}
+
+main{padding:22px 24px 28px;overflow:auto;min-width:0}
+.view{display:none} .view.on{display:block}
+
+.panel{background:linear-gradient(180deg,var(--panel),#0B182A);border:1px solid var(--line);border-radius:var(--radius);position:relative;min-width:0}
+.panel h2{font-family:var(--display);font-size:19px;font-weight:600;margin:0}
+.panel .sub{color:var(--muted);font-size:13.5px;margin-top:4px}
+.ph{padding:18px 22px 6px;display:flex;align-items:flex-start;gap:12px}
+.ph .right{margin-left:auto;color:var(--muted);font-size:13px}
+
+/* ---------- overview grid ---------- */
+.ov{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px}
+.mapwrap{height:580px;overflow:hidden}
+#map{position:absolute;inset:0;border-radius:var(--radius);background:#06101d}
+.map-title{position:absolute;top:18px;left:22px;z-index:500;pointer-events:none}
+.map-title h2{font-size:21px;text-shadow:0 2px 12px #000}
+.map-title .sub{color:#9FC3E8}
+.map-badge{position:absolute;top:18px;right:18px;z-index:500;display:flex;gap:8px;align-items:center}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,22,40,.85);display:grid;place-items:center;cursor:pointer}
+.iconbtn svg{width:20px;height:20px;stroke:var(--text);fill:none;stroke-width:1.8}
+.provider{font-size:11.5px;color:var(--muted);background:rgba(10,22,40,.85);border:1px solid var(--line2);padding:6px 10px;border-radius:20px}
+.legend{position:absolute;right:16px;bottom:16px;z-index:500;background:rgba(8,18,33,.88);border:1px solid #20365A;border-radius:10px;padding:14px 18px;display:grid;gap:11px;font-size:13px;color:#DCE6F3;backdrop-filter:blur(6px)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:14px;vertical-align:-1px}
+.legend .lg-red{background:#FF4B57;box-shadow:0 0 0 3px rgba(255,75,87,.25),0 0 10px #FF4B57}
+.legend .lg-blue{background:#2BB8F0;box-shadow:0 0 0 3px rgba(43,184,240,.25),0 0 10px #2BB8F0}
+.legend .lg-dot{width:7px;height:7px;margin:0 16px 0 3px}
+.map-title .when{margin-top:8px;display:inline-block;font-size:12px;color:#CFE3F7;background:rgba(43,198,240,.12);border:1px solid rgba(43,198,240,.3);border-radius:20px;padding:3px 10px}
+.mscale{position:absolute;left:20px;bottom:22px;z-index:500;color:#C9D6E8;font-size:12px;pointer-events:none}
+.mscale .bar{position:relative;height:8px;border-left:2px solid #C9D6E8;border-right:2px solid #C9D6E8;border-bottom:2px solid #C9D6E8;margin-top:6px}
+.mscale .bar::after{content:"";position:absolute;left:50%;bottom:0;height:6px;border-left:2px solid #C9D6E8}
+.mscale .lbls{position:relative;height:14px}
+.mscale .lbls span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:10px;vertical-align:-1px}
+.legend .ln{display:inline-block;width:18px;height:0;border-top:2px dashed var(--cyan);margin-right:4px;vertical-align:3px}
+.scale{position:absolute;left:22px;bottom:26px;z-index:500;color:var(--muted);font-size:12px}
+
+/* zone markers */
+.zm{position:absolute;width:0;height:0;cursor:pointer}
+.zm .glow{position:absolute;left:0;top:0;width:var(--r);height:var(--r);margin:calc(var(--r)/-2) 0 0 calc(var(--r)/-2);border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,color-mix(in srgb,var(--c) 75%,transparent) 0%,color-mix(in srgb,var(--c) 45%,transparent) 14%,color-mix(in srgb,var(--c) 18%,transparent) 36%,color-mix(in srgb,var(--c) 6%,transparent) 54%,transparent 68%);
+  opacity:var(--ga,1);
+  mix-blend-mode:screen;transition:width .25s,height .25s,margin .25s}
+.zm .ring{position:absolute;left:0;top:0;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:2px solid var(--c);opacity:0}
+.zm.need .ring{animation:ring var(--pulse) ease-out infinite}
+.zm .core{position:absolute;left:0;top:0;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 70%,transparent),0 0 16px 6px var(--c)}
+.zm.surplus .glow{opacity:calc(var(--ga,1)*.9)}
+.zm.balanced .glow{opacity:0}
+.zm.balanced .ring{display:none}
+.zm.balanced .core{width:6px;height:6px;margin:-3px 0 0 -3px;background:#6E86A8;box-shadow:0 0 6px 1px rgba(110,134,168,.6)}
+.gdot{position:absolute;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;box-shadow:0 0 6px 1px currentColor;pointer-events:none}
+.gdot.big{width:7px;height:7px;margin:-3.5px 0 0 -3.5px}
+.zm .dots i{position:absolute;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;opacity:.9;box-shadow:0 0 6px 1px currentColor}
+.leaflet-tile-pane{filter:sepia(1) hue-rotate(178deg) saturate(2.6) brightness(1.45) contrast(1.1)}
+#map.osm .leaflet-tile-pane{filter:invert(1) grayscale(1) brightness(.9) sepia(1) hue-rotate(178deg) saturate(2.2) brightness(1.1) contrast(1.05)}
+.map-tint{position:absolute;left:-6000px;top:-6000px;width:12000px;height:12000px;background:#0a2244;mix-blend-mode:screen;opacity:.8;pointer-events:none}
+.mtype{display:flex;background:rgba(10,22,40,.88);border:1px solid var(--line2);border-radius:22px;overflow:hidden}
+.mtype button{border:0;background:none;color:#B8C7DA;padding:8px 13px;font-size:12.5px;cursor:pointer}
+.mtype button.on{background:var(--cyan);color:#04121F;font-weight:600}
+.zbtns{position:absolute;right:18px;top:76px;z-index:500;display:grid;gap:8px}
+.zbtns .iconbtn{width:40px;height:40px;font-size:22px;line-height:1;color:#E7EEF8}
+.mapwrap:not([data-maptype=dark]) .leaflet-tile-pane{filter:none!important}
+.mapwrap:not([data-maptype=dark]) .map-tint{display:none}
+.mapwrap:not([data-maptype=dark]) .map-vig{background:radial-gradient(ellipse at 50% 50%,transparent 70%,rgba(4,10,22,.35) 100%)}
+.mapwrap:not([data-maptype=dark]) .zm .glow{mix-blend-mode:normal;opacity:calc(var(--ga,1)*.6)}
+.mapwrap:not([data-maptype=dark]) .map-title,.mapwrap:not([data-maptype=dark]) .mscale{background:rgba(8,18,33,.8);padding:10px 14px;border-radius:10px;backdrop-filter:blur(4px)}
+.mapwrap:not([data-maptype=dark]) .map-title{top:12px;left:14px}
+.mapwrap:not([data-maptype=dark]) .mscale{left:14px;bottom:16px;padding:6px 12px 8px}
+.map-vig{position:absolute;inset:0;z-index:450;pointer-events:none;border-radius:var(--radius);background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(4,10,22,.55) 100%)}
+.leaflet-control-scale-line{background:transparent!important;border:2px solid #9FB3CE!important;border-top:0!important;color:#C9D6E8!important;font-size:12px!important;padding:0 6px!important}
+.leaflet-bar a{background:rgba(10,22,40,.9)!important;color:#E7EEF8!important;border-color:#22395B!important}
+.zm .lbl{position:absolute;left:12px;top:-30px;white-space:nowrap;font-family:var(--display);font-weight:600;font-size:15px;padding:2px 4px;display:flex;align-items:center;gap:8px;color:#fff;text-shadow:0 1px 2px #000,0 0 10px rgba(0,0,0,.95),0 0 18px rgba(0,0,0,.8);pointer-events:none;opacity:0;transition:opacity .3s}
+.zm.show-lbl .lbl,.zm:hover .lbl,.zm.sel .lbl{opacity:1}
+.zm .lbl{left:16px;top:-24px;font-size:15.5px}
+.zm.sel .core{outline:2px solid #fff;outline-offset:4px}
+.zm:hover{z-index:5}
+@keyframes ring{0%{transform:scale(.6);opacity:.95}100%{transform:scale(4.2);opacity:0}}
+.leaflet-container{background:#06101d;font-family:var(--font)}
+.leaflet-control-attribution{background:rgba(7,17,32,.7)!important;color:var(--dim)!important}
+.leaflet-control-attribution a{color:var(--muted)!important}
+.leaflet-div-icon{background:none;border:0}
+.flow{stroke-dasharray:6 10;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-32}}
+
+/* zone card */
+.zcard{position:absolute;left:22px;top:86px;z-index:600;width:300px;background:rgba(9,19,35,.94);border:1px solid var(--line2);border-radius:14px;padding:16px 18px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(8px);display:none}
+.zcard.on{display:block;animation:pop .25s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.zcard h3{font-family:var(--display);margin:0;font-size:18px}
+.zcard .close{position:absolute;right:10px;top:10px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:18px;width:28px;height:28px}
+.tag{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;font-weight:600}
+.tag.need{background:rgba(255,75,87,.15);color:#FF7A83}
+.tag.surplus{background:rgba(43,198,240,.14);color:var(--cyan)}
+.tag.balanced{background:rgba(255,181,71,.13);color:var(--amber)}
+.zstats{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:14px 0 10px}
+.zstats div{font-size:12px;color:var(--muted)} .zstats b{display:block;font-family:var(--display);font-size:18px;color:var(--text);font-weight:600}
+.zcard .say{font-size:13px;line-height:1.5;color:#C9D6E8;border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+.zcard canvas{width:100%!important;height:70px!important}
+
+/* KPI */
+.kpis{display:grid;gap:14px;grid-template-rows:repeat(4,1fr);height:580px}
+.kpi{display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:16px;padding:14px 20px}
+.kpi svg{width:50px;height:50px;stroke:var(--cyan);fill:none;stroke-width:1.7}
+.kpi.red svg{stroke:var(--red)}
+.kpi .lab{color:#B8C7DA;font-size:15px}
+.kpi .val{font-family:var(--display);font-weight:700;font-size:36px;letter-spacing:-.02em;line-height:1.15}
+.kpi .delta{text-align:right;font-size:13px;color:var(--muted);line-height:1.4}
+.kpi .delta b{display:block;font-size:15px}
+.up{color:var(--green)} .down{color:var(--red)} .neutral{color:var(--amber)}
+
+/* controls */
+.controls{display:grid;grid-template-columns:minmax(0,1fr) 300px 290px;gap:18px;margin-top:18px}
+.ctrl{padding:16px 22px;display:flex;align-items:center;gap:18px}
+.slider{flex:1;min-width:0}
+.slider .row{display:flex;align-items:center;gap:14px}
+.slider label{font-size:15px;white-space:nowrap}
+.play{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid var(--cyan2);background:rgba(43,198,240,.1);cursor:pointer;display:grid;place-items:center}
+.play svg{width:16px;height:16px;fill:var(--cyan)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;background:linear-gradient(90deg,var(--cyan) var(--p,0%),#26405F var(--p,0%))}
+input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:#26405F}
+input[type=range]::-moz-range-progress{height:4px;border-radius:3px;background:var(--cyan)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-9px;border-radius:50%;background:#fff;border:5px solid var(--cyan);box-shadow:0 0 14px var(--cyan)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:5px solid var(--cyan);box-shadow:0 0 14px var(--cyan)}
+.ticks{display:flex;justify-content:space-between;color:var(--muted);font-size:12.5px;padding:0 4px 0 58px}
+.ticks span.on{color:var(--cyan);font-weight:600}
+.hourbig{font-family:var(--display);font-size:22px;font-weight:700;color:var(--cyan);min-width:76px;text-align:right}
+.seg{display:flex;border:1px solid var(--line2);border-radius:10px;overflow:hidden}
+.seg button{flex:1;padding:10px 16px;border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:14.5px}
+.seg button.on{background:linear-gradient(180deg,#165378,#0F3F5E);color:#fff;box-shadow:inset 0 0 0 1px var(--cyan2)}
+.ctrl .t{font-size:14.5px;margin-bottom:8px}
+.switch{display:flex;align-items:center;gap:12px;cursor:pointer;width:100%;border:0;background:none;padding:0;font-size:14.5px;text-align:left}
+.switch svg{width:28px;height:28px;stroke:var(--cyan);fill:none;stroke-width:1.7;flex:none}
+.switch .tr{margin-left:auto;width:52px;height:28px;border-radius:20px;background:#22395B;position:relative;transition:background .25s;flex:none}
+.switch .tr::after{content:"";position:absolute;left:4px;top:4px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .25s}
+.switch[aria-pressed=true] .tr{background:var(--cyan)}
+.switch[aria-pressed=true] .tr::after{left:28px}
+.switch small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+
+/* bottom row */
+.bottom{display:grid;grid-template-columns:1.15fr 1fr .95fr;gap:18px;margin-top:18px}
+.bottom .panel{min-height:330px}
+.chartbox{position:relative;height:250px;padding:4px 16px 14px}
+.lg{display:flex;gap:16px;font-size:13px;color:var(--muted)}
+.lg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
+.bars{padding:8px 22px 18px;display:grid;gap:9px}
+.bar{display:grid;grid-template-columns:132px 1fr 40px;align-items:center;gap:12px;font-size:13.5px;cursor:pointer}
+.bar .tr,.bar .fl,.qrow .tr,.qrow .fl{display:block}
+.bar .tr{height:12px;border-radius:6px;background:#132743;overflow:hidden}
+.bar .fl{height:100%;border-radius:6px;transition:width .6s}
+.bar .v{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.hp{padding:4px 22px 18px}
+.hp .tri{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line2);border-radius:12px;margin:10px 0 14px}
+.hp .tri div{padding:14px 10px;text-align:center;color:var(--muted);font-size:13px}
+.hp .tri div+div{border-left:1px solid var(--line2)}
+.hp .tri b{display:block;font-family:var(--display);font-size:28px;color:var(--text);margin-top:6px}
+.hp .tri b.c{color:var(--cyan)} .hp .tri b.g{color:var(--green)}
+.okline{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:14px;font-size:14px}
+.okline .ck{width:30px;height:30px;border-radius:50%;background:var(--green);display:grid;place-items:center;flex:none}
+.okline .ck svg{width:16px;height:16px;stroke:#062016;stroke-width:3;fill:none}
+.okline b{margin-left:auto;color:var(--green);font-family:var(--display);font-size:20px}
+.mini{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+
+/* generic views */
+.vh{display:flex;align-items:flex-end;gap:16px;margin:4px 0 18px}
+.vh h2{font-family:var(--display);font-size:24px;margin:0}
+.vh p{margin:6px 0 0;color:var(--muted)}
+.vh .seg{margin-left:auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.mt{margin-top:18px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{color:var(--muted);font-weight:500;text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+th.sorted{color:var(--cyan)}
+td{padding:11px 14px;border-bottom:1px solid rgba(26,45,73,.6)}
+tbody tr{cursor:pointer} tbody tr:hover{background:rgba(43,198,240,.05)}
+.idx{display:inline-block;min-width:44px;text-align:center;padding:3px 8px;border-radius:8px;font-weight:600;font-family:var(--display);font-size:12.5px}
+.heat{padding:10px 22px 22px;overflow:auto}
+.hm{display:grid;grid-template-columns:140px repeat(24,minmax(22px,1fr));gap:2px;font-size:11.5px;min-width:760px}
+.hm .rl{color:var(--muted);padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:center}
+.hm .c{height:22px;border-radius:3px;cursor:pointer}
+.hm .c:hover{outline:2px solid #fff}
+.hm .hl{color:var(--muted);text-align:center}
+.scalebar{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);padding:0 22px 18px}
+.scalebar span.g{width:200px;height:10px;border-radius:5px;background:linear-gradient(90deg,#1793C4,#2BC6F0,#FFB547,#FF4B57)}
+.routes{padding:8px 22px 20px;display:grid;gap:8px}
+.route{display:grid;grid-template-columns:1fr 70px;gap:12px;align-items:center;font-size:13.5px}
+.route .tr{height:8px;border-radius:4px;background:#132743;margin-top:6px}
+.route .fl{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--cyan2),var(--cyan))}
+.fest{padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:rgba(17,34,64,.4)}
+.fest h4{margin:0 0 10px;font-family:var(--display);font-size:16px}
+.fest .r{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:3px 0}
+.fest .r b{color:var(--text);font-weight:600}
+.fests{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:8px 22px 22px}
+.flowj{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;padding:12px 22px 22px}
+.job{border:1px solid var(--line2);border-radius:12px;padding:14px;background:rgba(17,34,64,.45);position:relative}
+.job:not(:last-child)::after{content:"";position:absolute;right:-12px;top:50%;width:12px;border-top:2px dashed var(--cyan2)}
+.job .n{font-size:12px;color:var(--cyan)}
+.job h4{margin:4px 0 6px;font-family:var(--display);font-size:15px}
+.job p{margin:0 0 10px;color:var(--muted);font-size:12.5px;line-height:1.45;min-height:54px}
+.job .chip{display:inline-block;font-size:11.5px;padding:3px 8px;border-radius:6px;background:rgba(43,198,240,.12);color:var(--cyan);margin-bottom:10px}
+.job .k{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);padding:2px 0}
+.job .k b{color:var(--text);font-variant-numeric:tabular-nums}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--green)}
+.st.no{color:var(--dim)}
+.empty{padding:28px 22px;color:var(--muted);line-height:1.6}
+.empty code{background:#0A1628;border:1px solid var(--line2);border-radius:6px;padding:2px 7px;color:var(--text)}
+.qrow{display:grid;grid-template-columns:170px 1fr 80px;gap:12px;align-items:center;font-size:13.5px;padding:5px 22px}
+.qrow .tr{height:10px;border-radius:5px;background:#132743} .qrow .fl{height:100%;border-radius:5px;background:var(--amber)}
+.stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:10px 22px 4px}
+.stats4 div{border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--muted);font-size:12.5px}
+.stats4 b{display:block;font-family:var(--display);font-size:20px;color:var(--text);margin-top:4px}
+
+@media (max-width:1280px){
+  .ov{grid-template-columns:1fr}.kpis{height:auto;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));grid-template-rows:none}
+  .controls{grid-template-columns:1fr}.bottom{grid-template-columns:1fr}.flowj{grid-template-columns:repeat(3,1fr)}.job::after{display:none}
+}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
+  header{flex-wrap:wrap;padding:14px 16px;gap:10px}.head-right{margin-left:0;flex-wrap:wrap}
+  nav{flex-direction:row;overflow-x:auto;padding:0;border-right:0;border-bottom:1px solid var(--line)}
+  nav button{padding:12px 16px;border-left:0;border-bottom:3px solid transparent;white-space:nowrap}
+  nav button.on{border-bottom-color:var(--cyan)} .nav-foot{display:none}
+  main{padding:16px}.mapwrap{height:480px}.grid2,.grid3{grid-template-columns:1fr}.flowj{grid-template-columns:1fr 1fr}
+  .stats4{grid-template-columns:1fr 1fr}.ticks{padding-left:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20 2C10.6 2 3 9.4 3 18.6 3 31 20 46 20 46s17-15 17-27.4C37 9.4 29.4 2 20 2z" fill="none" stroke="#2BC6F0" stroke-width="5"/><circle cx="20" cy="18.5" r="6" fill="#2BC6F0"/></svg>
+    <div><h1>Coimbatore Ride Pulse</h1><p>Urban mobility intelligence</p></div>
+  </div>
+  <div class="head-right">
+    <div class="pill ok" id="runPill"><span class="dot"></span><b id="runTitle">Hadoop batch</b><span id="runSub">–</span></div>
+    <div class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8DA2BF" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><b id="rangeTxt">–</b></div>
+  </div>
+</header>
+
+<nav aria-label="Sections">
+  <button class="on" data-view="overview"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Overview</button>
+  <button data-view="zones"><svg viewBox="0 0 24 24"><path d="M4 20V10M9 20V4M14 20v-8M19 20V7M2 21h20"/></svg>Demand Zones</button>
+  <button data-view="wait"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Wait Time</button>
+  <button data-view="weather"><svg viewBox="0 0 24 24"><path d="M7 17a5 5 0 01-.5-10A6 6 0 0118 8a4.5 4.5 0 01-1 9z"/><path d="M8 20l-1 2M12 20l-1 2M16 20l-1 2"/></svg>Rain &amp; Festivals</button>
+  <button data-view="hadoop"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Hadoop Benchmarks</button>
+  <div class="nav-foot">
+    <svg viewBox="0 0 200 96" fill="none" stroke="#7F93AE" stroke-width="1.1" stroke-linejoin="round">
+      <path d="M4 90h192"/>
+      <path d="M20 90V62h22v28M24 62v-6h14v6M27 56v-6h8v6M31 50v-6"/>
+      <path d="M150 90V60h26v30M154 60v-7h18v7M158 53v-7h10v7M163 46v-6"/>
+      <path d="M62 90V40l4-6h20l4 6v50M66 34v-8h20v8M70 26v-8h12v8M74 18v-7h4v7M76 11V5"/>
+      <path d="M68 52h4v8h-4zM80 52h4v8h-4zM68 68h4v8h-4zM80 68h4v8h-4zM73 90v-8a3 3 0 016 0v8"/>
+      <path d="M98 90V56h44v34M102 56l18-14 18 14M108 90V70a12 12 0 0124 0v20M120 42v-8M104 62h6M130 62h6"/>
+      <path d="M44 90v-14h14v14M48 76v-5h6v5M190 90v-18h-10v18"/>
+    </svg>
+    <div class="cap">Coimbatore<br>Greater moves together</div>
+  </div>
+</nav>
+
+<main>
+<!-- ================= OVERVIEW ================= -->
+<section class="view on" id="v-overview">
+  <div class="ov">
+    <div class="panel mapwrap">
+      <div id="map" role="application" aria-label="Map of Coimbatore driver demand"></div><div class="map-vig"></div>
+      <div class="map-title"><h2>Demand Map</h2><div class="sub">Pickup &amp; Dropoff Activity • Coimbatore</div><div class="when" id="mapSub"></div></div>
+      <div class="map-badge"><span class="provider" id="provider">Loading map…</span>
+        <div class="mtype" id="mtype" role="group" aria-label="Map style"><button data-t="satellite">Satellite</button><button data-t="map">Map</button><button data-t="dark">Dark</button></div>
+        <button class="iconbtn" id="recenter" title="North up, re-centre on Coimbatore" aria-label="Re-centre map"><svg viewBox="0 0 24 24"><path d="M12 2.5l4.2 10.5L12 11l-4.2 2z" fill="#E7EEF8" stroke="#E7EEF8" stroke-width="1"/><text x="12" y="21.5" text-anchor="middle" font-size="7" font-family="Inter" fill="#E7EEF8" stroke="none">N</text></svg></button></div>
+      <div class="mscale" id="mscale" aria-hidden="true"></div>
+      <div class="zbtns"><button class="iconbtn" id="zin" aria-label="Zoom in">+</button><button class="iconbtn" id="zout" aria-label="Zoom out">−</button></div>
+      <div class="zcard" id="zcard" role="dialog" aria-label="Area details"></div>
+      <div class="legend">
+        <div><i class="lg-red"></i>Need Drivers (High Demand)</div>
+        <div><i class="lg-blue"></i>Too Many Drivers (Low Demand)</div>
+        <div><i class="lg-dot" style="background:#FF5A66"></i>Pickup</div>
+        <div><i class="lg-dot" style="background:#3FD3F5"></i>Dropoff</div>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="controls">
+    <div class="panel ctrl">
+      <div class="slider">
+        <div class="row">
+          <button class="play" id="play" aria-label="Play through the day"><svg viewBox="0 0 16 16" id="playIcon"><path d="M4 2l10 6-10 6z"/></svg></button>
+          <label for="hour">Time of Day</label>
+          <input type="range" id="hour" min="0" max="23" step="1" value="18" aria-valuetext="18:00">
+          <div class="hourbig" id="hourTxt">18:00</div>
+        </div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+    </div>
+    <div class="panel ctrl" style="display:block">
+      <div class="t">View by Day Type</div>
+      <div class="seg" id="dtSeg"><button class="on" data-v="0">Weekday</button><button data-v="1">Weekend</button></div>
+    </div>
+    <div class="panel ctrl">
+      <button class="switch" id="rainSw" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M7 15a5 5 0 01-.5-10A6 6 0 0118 6a4.5 4.5 0 01-1 9z"/><path d="M8 18l-1 2.5M12 18l-1 2.5M16 18l-1 2.5"/></svg>
+        <span>Show Rain Impact<small id="rainNote">Showing all weather</small></span><span class="tr"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="panel">
+      <div class="ph"><div><h2>Hourly Demand</h2><div class="sub">Average per <span class="dtName">weekday</span></div></div>
+        <div class="right lg"><span><i style="background:var(--red)"></i>Pickups</span><span><i style="background:var(--cyan)"></i>Dropoffs</span></div></div>
+      <div class="chartbox"><canvas id="cHourly"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><div><h2>Avg Wait Time by Zone</h2><div class="sub" id="waitSub">At 18:00</div></div><div class="right">minutes</div></div>
+      <div class="bars" id="waitBars"></div>
+    </div>
+    <div class="panel" id="hpPanel"></div>
+  </div>
+</section>
+
+<!-- ================= ZONES ================= -->
+<section class="view" id="v-zones">
+  <div class="vh"><div><h2>Demand zones</h2><p id="zonesSub">Every area at the selected hour.</p></div></div>
+  <div class="panel"><div style="overflow:auto"><table id="zt"></table></div></div>
+  <div class="grid2 mt">
+    <div class="panel"><div class="ph"><div><h2>Busiest routes</h2><div class="sub" id="routesSub">–</div></div></div><div class="routes" id="routes"></div></div>
+    <div class="panel"><div class="ph"><div><h2>Top shortage hotspots</h2><div class="sub">Hadoop job 6 global ranking, all weather</div></div></div><div style="overflow:auto"><table id="rankT"></table></div></div>
+  </div>
+</section>
+
+<!-- ================= WAIT ================= -->
+<section class="view" id="v-wait">
+  <div class="vh"><div><h2>Wait time heatmap</h2><p>Average minutes from request to pickup, by area and hour. Click a cell to see it on the map.</p></div>
+    <div class="seg" id="dtSeg2"><button class="on" data-v="0">Weekday</button><button data-v="1">Weekend</button></div></div>
+  <div class="panel"><div class="heat" id="heat"></div>
+    <div class="scalebar">Short wait <span class="g"></span> Long wait <span id="heatRange"></span></div></div>
+  <div class="grid2 mt">
+    <div class="panel"><div class="ph"><div><h2>Riders left without a driver</h2><div class="sub">Share of requests with no driver found, by hour</div></div></div><div class="chartbox"><canvas id="cNd"></canvas></div></div>
+    <div class="panel"><div class="ph"><div><h2>Drivers near the rider</h2><div class="sub">Average idle drivers nearby when a ride is requested</div></div></div><div class="chartbox"><canvas id="cDrv"></canvas></div></div>
+  </div>
+</section>
+
+<!-- ================= WEATHER ================= -->
+<section class="view" id="v-weather">
+  <div class="vh"><div><h2>Rain &amp; festivals</h2><p>How situations change demand, waiting and driver shortage.</p></div></div>
+  <div class="grid2">
+    <div class="panel"><div class="ph"><div><h2>Wait in rain vs dry weather</h2><div class="sub">Average wait (minutes) by hour</div></div></div><div class="chartbox"><canvas id="cRainWait"></canvas></div></div>
+    <div class="panel"><div class="ph"><div><h2>No driver found, rain vs dry</h2><div class="sub">Share of requests by hour</div></div></div><div class="chartbox"><canvas id="cRainNd"></canvas></div></div>
+  </div>
+  <div class="panel mt"><div class="ph"><div><h2>Festival days</h2><div class="sub">Compared with the two-year average</div></div></div><div class="fests" id="fests"></div></div>
+  <div class="panel mt"><div class="ph"><div><h2>Every day, 2 years</h2><div class="sub">Requests per day and share of riders with no driver</div></div>
+    <div class="right lg"><span><i style="background:var(--cyan)"></i>Requests</span><span><i style="background:var(--red)"></i>No driver %</span></div></div>
+    <div class="chartbox" style="height:290px"><canvas id="cDaily"></canvas></div></div>
+</section>
+
+<!-- ================= HADOOP ================= -->
+<section class="view" id="v-hadoop">
+  <div class="vh"><div><h2>Hadoop pipeline &amp; benchmarks</h2><p id="hadoopSub">How the cluster processed the data.</p></div></div>
+  <div class="panel"><div class="ph"><div><h2>MapReduce pipeline</h2><div class="sub">Six chained jobs on a 1 master + 3 worker cluster</div></div></div><div class="flowj" id="jobs"></div></div>
+  <div class="grid2 mt">
+    <div class="panel"><div class="ph"><div><h2>HDFS storage</h2><div class="sub">How the raw data is split and replicated</div></div></div><div id="hdfs"></div></div>
+    <div class="panel"><div class="ph"><div><h2>Data quality (job 1 counters)</h2><div class="sub">Rows dropped by the cleaning job, by reason</div></div></div><div id="quality"></div></div>
+  </div>
+  <div class="grid3 mt" id="benchGrid">
+    <div class="panel"><div class="ph"><div><h2>More reducers</h2><div class="sub">Job 2 run time vs reducer count</div></div></div><div class="chartbox"><canvas id="cRed"></canvas></div></div>
+    <div class="panel"><div class="ph"><div><h2>Combiner on vs off</h2><div class="sub">Shuffle data sent to reducers (MB)</div></div></div><div class="chartbox"><canvas id="cComb"></canvas></div></div>
+    <div class="panel"><div class="ph"><div><h2>More data</h2><div class="sub">Job 2 run time vs months of data</div></div></div><div class="chartbox"><canvas id="cScale"></canvas></div></div>
+  </div>
+  <div class="panel mt" id="benchEmpty" style="display:none"><div class="empty"></div></div>
+</section>
+</main>
+</div>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+const D = window.RIDE_DATA;
+const CFG = window.RIDE_PULSE_CONFIG || {center:{lat:11.018,lng:76.985},zoom:12};
+if(!D){document.querySelector('main').innerHTML='<div class="panel empty">No data yet. Run <code>bash /project/scripts/run_all.sh</code> inside the master container, then reload.</div>';return;}
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => {const e=document.createElement(t); if(c) e.className=c; if(h!=null) e.innerHTML=h; return e;};
+const fmtInt = n => Math.round(n).toLocaleString('en-IN');
+const fmtK = n => n>=1e6 ? (n/1e6).toFixed(2)+'M' : n>=1e3 ? (n/1e3).toFixed(1)+'K' : Math.round(n)+'';
+const pct = (x,d=1) => (x*100).toFixed(d)+'%';
+const hh = h => String(h).padStart(2,'0')+':00';
+const ampm = h => {const x=h%24; return (x%12||12)+(x<12?' AM':' PM');};
+const mmss = m => {const s=Math.round(m*60); return Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s';};
+const STATUS = ['balanced','need','surplus'];
+const COL = {need:'#FF4B57', balanced:'#FFB547', surplus:'#2BC6F0'};
+const DTN = ['weekday','weekend'];
+const BAND = h => h<6?'night':h<11?'morning':h<16?'midday':h<21?'evening':'late';
+const BANDTXT = {night:'00:00–06:00',morning:'06:00–11:00',midday:'11:00–16:00',evening:'16:00–21:00',late:'21:00–24:00'};
+const zones = D.zones, NZ = zones.length;
+const days = D.meta.days;
+
+const state = {hour:18, dt:0, rain:false, zone:null, playing:false};
+
+/* vec: [req, comp, nd, canc, wsum, wlong, drv, fare, surge] */
+function cell(z,dt,h,w){ // w: 0 clear, 1 rain, 2 all
+  const C=D.cells[z][dt];
+  if(w<2) return C[w][h]||[0,0,0,0,0,0,0,0,0];
+  const a=C[0][h]||[], b=C[1][h]||[]; const o=[];
+  for(let i=0;i<9;i++) o.push((a[i]||0)+(b[i]||0));
+  return o;
+}
+function sh(z,dt,h,w){ return D.shortage[z][dt][w][h]; } // [idx,status,req,nd_rate,wait,long,drivers,surge]
+const W = () => state.rain ? 1 : 2;
+
+/* ---------- header ---------- */
+(function header(){
+  const m=D.meta;
+  const f=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  if(m.date_from) $('#rangeTxt').textContent=f(m.date_from)+' – '+f(m.date_to);
+  const pill=$('#runPill');
+  if(m.source==='hadoop' && D.pipeline && D.pipeline.length){
+    const ok=D.pipeline.every(j=>j.ok);
+    const t=m.last_run_at? new Date(m.last_run_at*1000):null;
+    $('#runTitle').textContent= ok?'Hadoop batch':'Hadoop batch (errors)';
+    $('#runSub').textContent= t? 'last run '+t.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    if(!ok) pill.className='pill warn';
+  } else {
+    pill.className='pill warn'; $('#runTitle').textContent='Local test run';
+    $('#runSub').textContent='same jobs, no cluster yet';
+  }
+})();
+
+/* ---------- KPIs ---------- */
+const ICON = {
+  rides:'<svg viewBox="0 0 24 24" style="fill:var(--cyan);stroke:none"><circle cx="12" cy="6.5" r="3.2"/><circle cx="5" cy="8.5" r="2.4"/><circle cx="19" cy="8.5" r="2.4"/><path d="M6.5 19.5v-3a5.5 5.5 0 0111 0v3z"/><path d="M1 19.5v-2.2A3.8 3.8 0 015.5 13.6 7 7 0 004.8 16.5v3zM23 19.5v-2.2a3.8 3.8 0 00-4.5-3.7 7 7 0 01.7 2.9v3z"/></svg>',
+  wait:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  nd:'<svg viewBox="0 0 24 24"><path d="M5 16l1.5-5A2 2 0 018.4 9.6h7.2a2 2 0 011.9 1.4L19 16v3h-2v-1H7v1H5z"/><circle cx="8" cy="15" r=".8"/><circle cx="16" cy="15" r=".8"/><path d="M3 3l18 18"/></svg>',
+  rain:'<svg viewBox="0 0 24 24"><path d="M7 15a5 5 0 01-.5-10A6 6 0 0118 6a4.5 4.5 0 01-1 9z"/><path d="M8 18l-1 2.5M12 18l-1 2.5M16 18l-1 2.5"/></svg>',
+  peak:'<svg viewBox="0 0 24 24" style="fill:var(--cyan);stroke:none"><rect x="2.5" y="12" width="4.5" height="9" rx="1"/><rect x="9.75" y="6" width="4.5" height="15" rx="1"/><rect x="17" y="9.5" width="4.5" height="11.5" rx="1"/></svg>'
+};
+function kpis(){
+  const Y=D.yearly, ys=Object.keys(Y).sort(), cur=Y[ys[ys.length-1]], prev=ys.length>1?Y[ys[ys.length-2]]:null;
+  const cy=ys[ys.length-1], py=ys.length>1?ys[ys.length-2]:null;
+  const wait = v => v[4]/v[1]/60, ndr = v => v[2]/v[0];
+  const delta=(a,b,inv)=>{ if(b==null) return ''; const d=(a-b)/b; const good=inv? d<0 : d>0;
+    return `<b class="${good?'up':'down'}">${d>=0?'▲':'▼'} ${Math.abs(d*100).toFixed(1)}%</b>vs ${py}`; };
+  // rain: share of requests in rain + wait in rain vs dry
+  let rw=[0,0],cw=[0,0];
+  D.weather.rain.forEach(v=>{ if(v){rw[0]+=v[4]; rw[1]+=v[1];}});
+  D.weather.clear.forEach(v=>{ if(v){cw[0]+=v[4]; cw[1]+=v[1];}});
+  const rainWait=rw[0]/rw[1]/60, dryWait=cw[0]/cw[1]/60, rainShare=cur[9]/cur[0];
+  // peak 2-hour window (weekday)
+  const hr=D.hourly.weekday.map(v=>v?v[0]:0), tot=hr.reduce((a,b)=>a+b,0);
+  let best=0,bh=0; for(let h=0;h<24;h++){const s=hr[h]+hr[(h+1)%24]; if(s>best){best=s;bh=h;}}
+  const cards=[
+    {i:'rides', under:'Rides in '+cy, lab:'', val:fmtK(cur[0]), d:prev?delta(cur[0],prev[0]):''},
+    {i:'wait', lab:'Average wait', val:mmss(wait(cur)), d:prev?delta(wait(cur),wait(prev),true):''},
+    {i:'rain', lab:'Rain rides', val:pct(rainShare), d:`<b class="neutral">+${((rainWait/dryWait-1)*100).toFixed(0)}%</b>wait vs dry`},
+    {i:'peak', lab:'Peak hour', val:(bh%12||12)+'–'+ampm(bh+2), d:`<b class="up">${pct(best/tot,0)}</b>of daily rides`}
+  ];
+  $('#kpis').innerHTML=cards.map(c=>`<div class="panel kpi ${c.red?'red':''}">${ICON[c.i]}<div>${c.under?`<div class="val">${c.val}</div><div class="lab" style="letter-spacing:.06em;text-transform:uppercase;font-size:13px">${c.under}</div>`:`<div class="lab">${c.lab}</div><div class="val">${c.val}</div>`}</div><div class="delta">${c.d}</div></div>`).join('');
+}
+
+/* ---------- map ---------- */
+const markers=[]; let mapApi=null;
+// Pickup / drop-off dots sit at fixed real coordinates around each area (metres -> degrees),
+// so they stay on the same street at every zoom level.
+const zoneDots=zones.map((Z,i)=>{ let seed=i*9973+7; const rnd=()=>{seed=(seed*16807)%2147483647; return seed/2147483647;};
+  const out=[]; for(let k=0;k<18;k++){ const a=rnd()*Math.PI*2, m=350+Math.pow(rnd(),0.7)*1700;
+    out.push({z:i,k,lat:Z.lat+Math.sin(a)*m/111320,lng:Z.lng+Math.cos(a)*m/(111320*Math.cos(Z.lat*Math.PI/180)),big:rnd()<.25}); }
+  return out; });
+const allDots=zoneDots.flat();
+const dotState=allDots.map(()=>({on:false,color:'#FF5A66'}));
+const metresPerPx=(lat,zoom)=>156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,zoom);
+// Glows are sized in metres on the ground, converted to pixels for the current zoom.
+function sizeGlows(){
+  if(!mapApi) return; const z=mapApi.zoom(), m=metresPerPx(11.02,z);
+  const ga=z<=12.5?1:z>=15?0.3:1-(z-12.5)*0.28;   // fade the glow when zoomed in so streets stay visible
+  document.documentElement.style.setProperty('--ga',ga.toFixed(2));
+  markers.forEach(e=>{ if(!e) return; const px=Math.min(240,(e._diamM||0)/m); e.style.setProperty('--r',px.toFixed(0)+'px'); });
+}
+function markerEl(i){
+  const e=el('div','zm');
+  e.innerHTML='<span class="glow"></span><span class="ring"></span><span class="core"></span><span class="lbl"></span>';
+  e.querySelector('.lbl').textContent=zones[i].name;
+  if(zones[i].type==='airport') e.querySelector('.lbl').insertAdjacentHTML('afterbegin','<svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M21 15.5v-2l-8-5V3.5a1.5 1.5 0 00-3 0V8.5l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-6z"/></svg>');
+  e.addEventListener('click',ev=>{ev.stopPropagation(); selectZone(i);});
+  e.setAttribute('role','button'); e.setAttribute('tabindex','0'); e.setAttribute('aria-label',zones[i].name);
+  e.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault(); selectZone(i);}});
+  return e;
+}
+function updateMarkers(){
+  const h=state.hour, dt=state.dt, w=W();
+  let maxReq=1; for(let z=0;z<NZ;z++){const s=sh(z,dt,h,w); if(s) maxReq=Math.max(maxReq,s[2]);}
+  for(let z=0;z<NZ;z++){
+    const e=markers[z]; if(!e) continue;
+    const s=sh(z,dt,h,w);
+    const st= s? STATUS[s[1]] : 'balanced';
+    const req= s? s[2]:0, idx=s? s[0]:0, f=Math.sqrt(req/maxReq);
+    e.className='zm '+st+(state.zone===z?' sel':'');
+    e.style.setProperty('--c',COL[st]);
+    e._diamM = st==='balanced' ? 0 : st==='need' ? 1600+2200*f : 1100+1400*f;   // glow diameter in metres
+    e.style.setProperty('--pulse',(2.6-1.9*Math.min(idx/100,1)).toFixed(2)+'s');
+    const nDots=st==='balanced'? Math.round(2+6*f) : Math.round(6+12*f);
+    const redShare= st==='need'? .8 : st==='surplus'? .25 : .5;   // pickups (red) vs drop-offs (cyan)
+    zoneDots[z].forEach(d=>{ const ds=dotState[z*18+d.k]; ds.on=d.k<nDots; ds.color=(d.k*0.618)%1<redShare?'#FF5A66':'#3FD3F5'; });
+  }
+  if(mapApi){ mapApi.updateDots(); sizeGlows(); }
+  // label the strongest shortage and surplus areas (like the design), skipping crowded spots
+  const strength=z=>{const s=sh(z,dt,h,w); if(!s) return -1; return s[1]===1? 100+s[0] : s[1]===2? 50+s[6] : -1;};
+  const ranked=[]; for(let z=0;z<NZ;z++) ranked.push([strength(z),z]);
+  ranked.sort((a,b)=>b[0]-a[0]);
+  const top=new Set();
+  for(const [v,z] of ranked){ if(top.size>=9||v<0) break;
+    if([...top].every(t=>Math.abs(zones[t].lat-zones[z].lat)>0.013||Math.abs(zones[t].lng-zones[z].lng)>0.05)) top.add(z); }
+  if(state.zone!=null) top.add(state.zone);
+  markers.forEach((e,z)=>{ if(!e) return; const on=top.has(z); e.classList.toggle('show-lbl',on);
+    e.style.zIndex= on? (state.zone===z?3:2) : 1; if(e._lm) e._lm.setZIndexOffset(on?(state.zone===z?2000:1000):0); });
+  $('#mapSub').textContent=`${hh(h)} · ${DTN[dt][0].toUpperCase()+DTN[dt].slice(1)}${state.rain?' · Rain hours':''}`;
+}
+function routesFor(h){
+  const far=r=>Math.hypot(zones[r[0]].lat-zones[r[1]].lat,zones[r[0]].lng-zones[r[1]].lng)>0.02; // skip trips too short to see
+  const rs=(D.routes[BAND(h)]||[]).filter(r=>r[0]!==r[1]&&far(r)).slice(0,12);
+  const max=rs.length?rs[0][2]:1;
+  return rs.map(r=>({a:zones[r[0]],b:zones[r[1]],w:r[2]/max}));
+}
+function curve(a,b,n=24){ // gentle arc between two points
+  const mx=(a.lat+b.lat)/2, my=(a.lng+b.lng)/2, dx=b.lat-a.lat, dy=b.lng-a.lng;
+  const cx=mx-dy*0.18, cy=my+dx*0.18, pts=[];
+  for(let i=0;i<=n;i++){const t=i/n; pts.push([(1-t)*(1-t)*a.lat+2*(1-t)*t*cx+t*t*b.lat,(1-t)*(1-t)*a.lng+2*(1-t)*t*cy+t*t*b.lng]);}
+  return pts;
+}
+const DARK_STYLE=[
+ {elementType:'geometry',stylers:[{color:'#0a1628'}]},
+ {elementType:'labels',stylers:[{visibility:'off'}]},
+ {featureType:'administrative',elementType:'geometry',stylers:[{visibility:'off'}]},
+ {featureType:'landscape.man_made',elementType:'geometry',stylers:[{color:'#0c1b31'}]},
+ {featureType:'landscape.natural',elementType:'geometry',stylers:[{color:'#0a1628'}]},
+ {featureType:'poi',stylers:[{visibility:'off'}]},
+ {featureType:'road.local',elementType:'geometry',stylers:[{color:'#142c4d'}]},
+ {featureType:'road.arterial',elementType:'geometry',stylers:[{color:'#1c3d66'}]},
+ {featureType:'road.highway',elementType:'geometry.fill',stylers:[{color:'#2a5689'}]},
+ {featureType:'road.highway',elementType:'geometry.stroke',stylers:[{color:'#0d2140'}]},
+ {featureType:'transit.line',elementType:'geometry',stylers:[{color:'#1a3558'}]},
+ {featureType:'transit.station.airport',elementType:'geometry',stylers:[{color:'#16304f'}]},
+ {featureType:'water',elementType:'geometry',stylers:[{color:'#1d4170'}]}
+];
+function drawScale(lat,zoom){ // "0  2.5  5 km" bar like the design
+  const mpp=156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,zoom);
+  let km=5; while(km*1000/mpp>170) km/=2; while(km*1000/mpp<70) km*=2;
+  const w=Math.round(km*1000/mpp), half=(km/2)%1?(km/2).toFixed(1):km/2;
+  $('#mscale').innerHTML=`<div class="lbls" style="width:${w}px"><span style="left:0">0</span><span style="left:50%">${half}</span><span style="left:100%;transform:translateX(-30%)">${km} km</span></div><div class="bar" style="width:${w}px"></div>`;
+}
+function cityBounds(){ let a=90,b=-90,c=180,d=-180; zones.forEach(z=>{a=Math.min(a,z.lat);b=Math.max(b,z.lat);c=Math.min(c,z.lng);d=Math.max(d,z.lng);}); return [[a,c],[b,d]]; }
+let mapType=(()=>{ try{ return localStorage.getItem('rp_maptype')||'satellite'; }catch(e){ return 'satellite'; } })();
+function initGoogle(){
+  const g=google.maps;
+  const map=new g.Map($('#map'),{center:CFG.center,zoom:CFG.zoom,disableDefaultUI:true,keyboardShortcuts:false,backgroundColor:'#06101d',clickableIcons:false,gestureHandling:'greedy'});
+  const dotEls=allDots.map(d=>{ const x=el('i','gdot'+(d.big?' big':'')); return x; });
+  class ZoneLayer extends g.OverlayView{
+    onAdd(){ this.box=el('div'); this.box.style.position='absolute';
+      dotEls.forEach(x=>this.box.appendChild(x));
+      zones.forEach((z,i)=>{const e=markerEl(i); markers[i]=e; this.box.appendChild(e);});
+      this.getPanes().overlayMouseTarget.appendChild(this.box); updateMarkers(); }
+    draw(){ const p=this.getProjection(); if(!p) return;
+      zones.forEach((z,i)=>{const pt=p.fromLatLngToDivPixel(new g.LatLng(z.lat,z.lng)); markers[i].style.left=pt.x+'px'; markers[i].style.top=pt.y+'px';});
+      allDots.forEach((d,k)=>{const pt=p.fromLatLngToDivPixel(new g.LatLng(d.lat,d.lng)); dotEls[k].style.left=pt.x+'px'; dotEls[k].style.top=pt.y+'px';});
+      sizeGlows(); }
+    onRemove(){ this.box.remove(); }
+  }
+  new ZoneLayer().setMap(map);
+  mapApi={
+    zoom(){ return map.getZoom(); },
+    zoomBy(d){ map.setZoom(map.getZoom()+d); },
+    updateDots(){ dotEls.forEach((x,k)=>{ const s=dotState[k]; x.style.display=s.on?'block':'none'; x.style.background=s.color; x.style.color=s.color; }); },
+    setType(t){ if(t==='satellite') map.setOptions({mapTypeId:'hybrid',styles:null});
+      else if(t==='map') map.setOptions({mapTypeId:'roadmap',styles:null});
+      else map.setOptions({mapTypeId:'roadmap',styles:DARK_STYLE}); },
+    recenter(){ const b=cityBounds(); map.fitBounds({south:b[0][0],west:b[0][1],north:b[1][0],east:b[1][1]},{top:95,left:60,right:60,bottom:40}); },
+    resize(){ g.event.trigger(map,'resize'); },
+    focus(z){ map.panTo({lat:z.lat,lng:z.lng}); }
+  };
+  map.addListener('click',()=>selectZone(null));
+  map.addListener('idle',()=>drawScale(map.getCenter().lat(),map.getZoom()));
+  map.addListener('zoom_changed',sizeGlows);
+  mapApi.recenter();
+  $('#provider').textContent='Google Maps';
+  setMapType(mapType);
+  updateMarkers();
+}
+function initLeaflet(reason){
+  if(typeof L==='undefined'){ $('#provider').textContent='Map library could not load (offline?)'; zones.forEach((z,i)=>markers[i]=null); return; }
+  const map=L.map('map',{zoomControl:false,attributionControl:true,zoomSnap:0.25}).fitBounds(cityBounds(),{paddingTopLeft:[60,95],paddingBottomRight:[60,40]});
+  map.createPane('tint'); map.getPane('tint').style.zIndex=250; map.getPane('tint').style.pointerEvents='none'; map.getPane('tint').appendChild(el('div','map-tint'));
+  map.createPane('dots'); map.getPane('dots').style.zIndex=590; map.getPane('dots').style.pointerEvents='none';
+  const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/';
+  const esriAttr='Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics, HERE, Garmin, &copy; OpenStreetMap contributors';
+  const osm=()=>L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'});
+  const BASES={
+    satellite:()=>L.layerGroup([
+      L.tileLayer(ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:esriAttr}),
+      L.tileLayer(ESRI+'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}),
+      L.tileLayer(ESRI+'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19})]),
+    map:()=>osm(),
+    dark:()=>{ const b=L.tileLayer(ESRI+'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:esriAttr});
+      let errs=0; b.on('tileerror',()=>{ if(++errs!==4) return; map.removeLayer(b); $('#map').classList.add('osm'); current=osm().addTo(map); }); return b; },
+  };
+  let current=null;
+  zones.forEach((z,i)=>{const e=markerEl(i); markers[i]=e; e._lm=L.marker([z.lat,z.lng],{icon:L.divIcon({className:'',html:e,iconSize:[0,0]}),keyboard:false}).addTo(map);});
+  const dotLayers=allDots.map(d=>L.circleMarker([d.lat,d.lng],{pane:'dots',radius:d.big?3.6:2.6,stroke:false,fillOpacity:0,interactive:false}).addTo(map));
+  mapApi={
+    zoom(){ return map.getZoom(); },
+    zoomBy(d){ map.setZoom(map.getZoom()+d); },
+    updateDots(){ dotLayers.forEach((c,k)=>{ const s=dotState[k]; c.setStyle({fillColor:s.color,fillOpacity:s.on?0.95:0}); }); },
+    setType(t){ if(current) map.removeLayer(current); $('#map').classList.remove('osm'); current=BASES[t]().addTo(map); },
+    recenter(){ map.fitBounds(cityBounds(),{paddingTopLeft:[60,95],paddingBottomRight:[60,40]}); },
+    resize(){ map.invalidateSize(); },
+    focus(z){ map.panTo([z.lat,z.lng]); }
+  };
+  map.on('click',()=>selectZone(null));
+  map.on('zoom zoomend',sizeGlows);
+  map.on('zoomend moveend',()=>drawScale(map.getCenter().lat,map.getZoom())); drawScale(map.getCenter().lat,map.getZoom());
+  $('#provider').textContent= reason || 'Free map · add a Google key in config.js';
+  setMapType(mapType);
+  updateMarkers();
+}
+function setMapType(t){
+  mapType=t; $('.mapwrap').dataset.maptype=t;
+  document.querySelectorAll('#mtype button').forEach(b=>{ b.classList.toggle('on',b.dataset.t===t); b.setAttribute('aria-pressed',b.dataset.t===t); });
+  if(mapApi) mapApi.setType(t);
+  try{ localStorage.setItem('rp_maptype',t); }catch(e){}
+}
+function initMap(){
+  if(!window.RIDE_PULSE_CONFIG){ initLeaflet('config.js has an error · check the key is on one line'); return; }
+  const key=(CFG.googleMapsApiKey||'').trim();
+  if(!key){ initLeaflet(); return; }
+  let done=false;
+  window.gm_authFailure=()=>{ if(done) return; done=true; $('#map').innerHTML=''; markers.length=0; initLeaflet('Google key rejected · using OpenStreetMap'); };
+  window.__gmInit=()=>{ if(done) return; try{ initGoogle(); done=true; }catch(e){ console.error(e); done=true; initLeaflet('Google Maps failed · using OpenStreetMap'); } };
+  const s=document.createElement('script');
+  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&callback=__gmInit&v=weekly';
+  s.async=true; s.onerror=()=>{ if(!done){done=true; initLeaflet('Google Maps unreachable · using OpenStreetMap');} };
+  document.head.appendChild(s);
+}
+$('#recenter').onclick=()=>mapApi&&mapApi.recenter();
+document.querySelectorAll('#mtype button').forEach(b=>b.onclick=()=>setMapType(b.dataset.t));
+$('#zin').onclick=()=>mapApi&&mapApi.zoomBy(1); $('#zout').onclick=()=>mapApi&&mapApi.zoomBy(-1);
+// The map may be created while the Overview tab is hidden (0 px wide). Re-fit once it has a real size.
+let mapFitted=false;
+new ResizeObserver(()=>{ const w=$('#map').clientWidth; if(!mapApi||!w) return; mapApi.resize(); if(!mapFitted){ mapFitted=true; mapApi.recenter(); } }).observe($('#map'));
+
+/* ---------- zone card ---------- */
+let spark=null;
+function selectZone(z){
+  state.zone=z; const card=$('#zcard');
+  if(z==null){ card.classList.remove('on'); updateMarkers(); return; }
+  const h=state.hour, dt=state.dt, w=W(), s=sh(z,dt,h,w), Z=zones[z];
+  if(!s){ card.classList.remove('on'); return; }
+  const st=STATUS[s[1]], nDays=(state.rain? null : days[DTN[dt]]);
+  const perDay = nDays ? s[2]/nDays : null;
+  const unserved = nDays ? s[2]*s[3]/nDays : null;
+  const said = st==='need'
+    ? `Riders here wait <b>${s[4].toFixed(1)} min</b> on average and <b>${pct(s[3])}</b> get no driver. Send more drivers to ${Z.name} around ${hh(h)}.`
+    : st==='surplus'
+    ? `About <b>${s[6].toFixed(1)}</b> idle drivers are near each rider. Some can be moved to a shortage area.`
+    : `Supply roughly matches demand at this hour.`;
+  const dests=(D.routes[BAND(h)]||[]).filter(r=>r[0]===z&&r[1]!==z).slice(0,3).map(r=>zones[r[1]].name);
+  card.innerHTML=`<button class="close" aria-label="Close">×</button>
+    <h3>${Z.name}</h3><div style="margin-top:6px"><span class="tag ${st}">${st==='need'?'Need drivers':st==='surplus'?'Too many drivers':'Balanced'}</span>
+    <span style="color:var(--muted);font-size:12px;margin-left:8px">${Z.type.replace('_',' / ')} · ${hh(h)} ${DTN[dt]}</span></div>
+    <div class="zstats">
+      <div>Shortage index<b style="color:${COL[st]}">${s[0].toFixed(0)}<small style="font-size:12px;color:var(--muted)">/100</small></b></div>
+      <div>${perDay!=null?'Requests / day':'Requests (rain hrs)'}<b>${perDay!=null?perDay.toFixed(0):fmtInt(s[2])}</b></div>
+      <div>Average wait<b>${mmss(s[4])}</b></div>
+      <div>No driver found<b>${pct(s[3])}</b></div>
+      <div>Waits over 10 min<b>${pct(s[5],0)}</b></div>
+      <div>Idle drivers nearby<b>${s[6].toFixed(1)}</b></div>
+    </div>
+    ${unserved!=null?`<div class="mini" style="margin:0 0 8px">≈ <b style="color:var(--text)">${unserved.toFixed(0)}</b> riders/day get no driver in this hour.</div>`:''}
+    <canvas id="spark"></canvas>
+    <div class="say">${said}${dests.length?`<br><span style="color:var(--muted)">Most trips go to ${dests.join(', ')}.</span>`:''}</div>`;
+  card.classList.add('on');
+  card.querySelector('.close').onclick=()=>selectZone(null);
+  const series=[]; for(let i=0;i<24;i++){const x=sh(z,dt,i,w); series.push(x?x[0]:null);}
+  if(spark) spark.destroy();
+  spark=new Chart($('#spark'),{type:'bar',data:{labels:series.map((_,i)=>i),datasets:[{data:series,backgroundColor:series.map((v,i)=>i===h?'#fff':v>=50?'#FF4B57':v<15?'#2BC6F0':'#FFB547'),borderRadius:2,barPercentage:.8}]},
+    options:{animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:t=>hh(t[0].dataIndex),label:t=>'Shortage index '+(t.raw||0).toFixed(0)}}},scales:{x:{display:false},y:{display:false,min:0,max:100}},maintainAspectRatio:false}});
+  updateMarkers();
+}
+
+/* ---------- controls ---------- */
+const ticks=$('#ticks'); for(let h=0;h<24;h+=2){const s=el('span',null,hh(h)); s.dataset.h=h; ticks.appendChild(s);}
+function setHour(h){
+  state.hour=h; const r=$('#hour'); r.value=h; r.setAttribute('aria-valuetext',hh(h));
+  r.style.setProperty('--p',(h/23*100)+'%'); $('#hourTxt').textContent=hh(h);
+  ticks.querySelectorAll('span').forEach(s=>s.classList.toggle('on',+s.dataset.h===h||+s.dataset.h===h-1));
+  refresh();
+}
+$('#hour').addEventListener('input',e=>setHour(+e.target.value));
+let timer=null;
+$('#play').onclick=()=>{
+  state.playing=!state.playing;
+  $('#playIcon').innerHTML= state.playing?'<path d="M3 2h4v12H3zM9 2h4v12H9z"/>':'<path d="M4 2l10 6-10 6z"/>';
+  $('#play').setAttribute('aria-label',state.playing?'Pause':'Play through the day');
+  if(state.playing) timer=setInterval(()=>setHour((state.hour+1)%24),900); else clearInterval(timer);
+};
+function setDt(v){ state.dt=v; document.querySelectorAll('#dtSeg button,#dtSeg2 button').forEach(b=>b.classList.toggle('on',+b.dataset.v===v)); document.querySelectorAll('.dtName').forEach(s=>s.textContent=DTN[v]); refresh(); }
+document.querySelectorAll('#dtSeg button,#dtSeg2 button').forEach(b=>b.onclick=()=>setDt(+b.dataset.v));
+$('#rainSw').onclick=()=>{ state.rain=!state.rain; $('#rainSw').setAttribute('aria-pressed',state.rain); $('#rainNote').textContent=state.rain?'Only hours when it rained':'Showing all weather'; refresh(); };
+
+/* ---------- charts ---------- */
+Chart.defaults.color='#8DA2BF'; Chart.defaults.font.family="Inter, system-ui, sans-serif"; Chart.defaults.font.size=12;
+Chart.defaults.borderColor='#16283F';
+const hourLine={id:'hourLine',afterDatasetsDraw(c){ if(c.config.options.hourLine==null) return; const x=c.scales.x.getPixelForValue(state.hour); const {top,bottom}=c.chartArea; const g=c.ctx; g.save(); g.strokeStyle='rgba(255,255,255,.35)'; g.setLineDash([4,4]); g.beginPath(); g.moveTo(x,top); g.lineTo(x,bottom); g.stroke(); g.restore(); }};
+Chart.register(hourLine);
+function grad(ctx,area,c){ if(!area) return c+'33'; const g=ctx.createLinearGradient(0,area.top,0,area.bottom); g.addColorStop(0,c+'55'); g.addColorStop(1,c+'00'); return g; }
+const glow={id:'glow',beforeDatasetDraw(c,a){const ds=c.data.datasets[a.index]; if(!ds.glow) return; c.ctx.save(); c.ctx.shadowColor=ds.borderColor; c.ctx.shadowBlur=12;},afterDatasetDraw(c,a){ if(c.data.datasets[a.index].glow) c.ctx.restore(); }};
+Chart.register(glow);
+const H24=[...Array(24).keys()].map(hh);
+const baseOpts=(extra={})=>Object.assign({maintainAspectRatio:false,responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9}},y:{beginAtZero:true,grid:{color:'#14263D'}}}},extra);
+
+let cHourly;
+function hourlyChart(){
+  const dtn=DTN[state.dt], n=days[dtn]||1;
+  const req=D.hourly[dtn].map(v=>v?v[1]/n:0), dro=D.dropoffs[dtn].map(v=>v/n);
+  if(!cHourly){
+    cHourly=new Chart($('#cHourly'),{type:'line',data:{labels:H24,datasets:[
+      {label:'Pickups',data:req,borderColor:'#FF4B57',backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,'#FF4B57'),fill:true,tension:.4,pointRadius:2.5,pointBackgroundColor:'#FF4B57',borderWidth:2.5,glow:true},
+      {label:'Dropoffs',data:dro,borderColor:'#2BC6F0',backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,'#2BC6F0'),fill:true,tension:.4,pointRadius:2.5,pointBackgroundColor:'#2BC6F0',borderWidth:2.5,glow:true}]},
+      options:baseOpts({hourLine:true,scales:{x:{grid:{color:'#12233A'},ticks:{maxTicksLimit:9}},y:{beginAtZero:true,grid:{color:'#12233A'},ticks:{callback:v=>fmtK(v)}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:t=>t.dataset.label+': '+fmtInt(t.raw)+' / day'}}}})});
+  } else { cHourly.data.datasets[0].data=req; cHourly.data.datasets[1].data=dro; cHourly.update('none'); }
+}
+function waitBars(){
+  const h=state.hour, dt=state.dt, w=W(), arr=[];
+  for(let z=0;z<NZ;z++){const s=sh(z,dt,h,w); if(s && s[2]>=20) arr.push([s[4],z,s[1]]);}
+  arr.sort((a,b)=>b[0]-a[0]);
+  const top=arr.slice(0,8), max=top.length?top[0][0]:1;
+  $('#waitSub').textContent=`At ${hh(h)}, ${DTN[dt]}${state.rain?', rain hours':''}`;
+  $('#waitBars').innerHTML=top.map(([m,z,st],i)=>{
+    const c= st===1?'linear-gradient(90deg,#C9303C,#FF4B57)': st===2?'linear-gradient(90deg,#1593C4,#2BC6F0)':'linear-gradient(90deg,#B97B1F,#FFB547)';
+    return `<div class="bar" data-z="${z}"><span>${zones[z].name}</span><span class="tr"><span class="fl" style="width:${(m/max*100).toFixed(1)}%;background:${c}"></span></span><span class="v">${m.toFixed(1)}</span></div>`;}).join('');
+  $('#waitBars').querySelectorAll('.bar').forEach(b=>b.onclick=()=>selectZone(+b.dataset.z));
+}
+function hadoopPanel(){
+  const p=$('#hpPanel'), B=D.benchmarks||[], P=D.pipeline||[];
+  const red=B.filter(b=>b.tag==='reducers'&&b.ok).sort((a,b)=>a.reducers-b.reducers);
+  let html=`<div class="ph"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2BC6F0" stroke-width="1.6"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><circle cx="12" cy="13" r="2"/><path d="M12 7.5V11M10.5 14.5L6.8 16.5M13.5 14.5l3.7 2"/></svg><div><h2>Hadoop Performance</h2><div class="sub">Ride analytics on Hadoop cluster</div></div></div><div class="hp">`;
+  if(red.length){
+    const t1=red[0].seconds, best=red.reduce((a,b)=>b.seconds<a.seconds?b:a);
+    html+=`<div class="tri"><div>Best reducers<b>${best.reducers}</b></div><div>Combiner<b class="g">ON</b></div><div>Speed-up<b class="c">${(t1/best.seconds).toFixed(1)}×</b></div></div>`;
+  } else if(P.length){
+    const maps=P.reduce((a,j)=>a+(j.counters.map_tasks||0),0), secs=P.reduce((a,j)=>a+j.seconds,0);
+    html+=`<div class="tri"><div>Map tasks<b>${maps}</b></div><div>Combiner<b class="g">ON</b></div><div>Total time<b class="c">${(secs/60).toFixed(1)}m</b></div></div>`;
+  } else {
+    html+=`<div class="tri"><div>Jobs<b>6</b></div><div>Combiner<b class="g">ON</b></div><div>Cluster nodes<b class="c">4</b></div></div>`;
+  }
+  const ok=P.filter(j=>j.ok).length, tot=P.length;
+  if(tot) html+=`<div class="okline"><span class="ck"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>Jobs completed successfully<b>${ok}/${tot}</b></div>`;
+  else html+=`<div class="okline" style="color:var(--muted)">These numbers come from a local test run. Run the pipeline on the cluster to fill in real Hadoop timings.</div>`;
+  if(red.length) html+=`<div class="mini">Job 2 on ${fmtK(red[0].counters.map_input_records||0)} rows: ${red.map(r=>r.reducers+' reducer'+(r.reducers>1?'s':'')+' '+r.seconds.toFixed(0)+'s').join(' · ')}</div>`;
+  p.innerHTML=html+'</div>';
+}
+
+/* ---------- zones view ---------- */
+let zsort={k:'idx',dir:-1};
+function zonesView(){
+  const h=state.hour, dt=state.dt, w=W(), nd=days[DTN[dt]]||1;
+  const ys=Object.keys(D.yearZone).sort(), y1=ys[ys.length-1], y0=ys.length>1?ys[0]:null;
+  $('#zonesSub').textContent=`At ${hh(h)} on a ${DTN[dt]}${state.rain?', rain hours only':''}. Change the hour on the Overview slider. Click a row to see it on the map.`;
+  const rows=zones.map((Z,z)=>{const s=sh(z,dt,h,w)||[0,0,0,0,0,0,0,1];
+    const g = y0 && D.yearZone[y0][Z.name] ? D.yearZone[y1][Z.name][0]/D.yearZone[y0][Z.name][0]-1 : null;
+    return {z,name:Z.name,type:Z.type.replace('_',' / '),st:s[1],idx:s[0],req:state.rain?s[2]:s[2]/nd,nd:s[3],wait:s[4],drv:s[6],surge:s[7],growth:g};});
+  rows.sort((a,b)=> (a[zsort.k]>b[zsort.k]?1:a[zsort.k]<b[zsort.k]?-1:0)*zsort.dir);
+  const cols=[['name','Area'],['type','Type'],['st','Status'],['idx','Shortage index',1],['req',state.rain?'Requests (rain hrs)':'Requests / day',1],['nd','No driver',1],['wait','Avg wait (min)',1],['drv','Idle drivers nearby',1],['surge','Avg surge',1],['growth','Growth '+(y0?y1+' vs '+y0:''),1]];
+  const idxBg=st=>st===1?'rgba(255,75,87,.18);color:#FF7A83':st===2?'rgba(43,198,240,.14);color:#2BC6F0':'rgba(255,181,71,.13);color:#FFB547';
+  $('#zt').innerHTML='<thead><tr>'+cols.map(c=>`<th data-k="${c[0]}" class="${c[2]?'num':''} ${zsort.k===c[0]?'sorted':''}" aria-sort="${zsort.k===c[0]?(zsort.dir>0?'ascending':'descending'):'none'}">${c[1]}${zsort.k===c[0]?(zsort.dir>0?' ↑':' ↓'):''}</th>`).join('')+'</tr></thead><tbody>'+
+   rows.map(r=>`<tr data-z="${r.z}"><td>${r.name}</td><td style="color:var(--muted)">${r.type}</td><td><span class="tag ${STATUS[r.st]}">${['Balanced','Need drivers','Too many drivers'][r.st]}</span></td>
+   <td class="num"><span class="idx" style="background:${idxBg(r.st)}">${r.idx.toFixed(0)}</span></td><td class="num">${fmtInt(r.req)}</td><td class="num">${pct(r.nd)}</td><td class="num">${r.wait.toFixed(1)}</td><td class="num">${r.drv.toFixed(1)}</td><td class="num">${r.surge.toFixed(2)}×</td>
+   <td class="num ${r.growth==null?'':r.growth>=0?'up':'down'}">${r.growth==null?'–':(r.growth>=0?'+':'')+(r.growth*100).toFixed(1)+'%'}</td></tr>`).join('')+'</tbody>';
+  $('#zt').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k; zsort= zsort.k===k?{k,dir:-zsort.dir}:{k,dir:(k==='name'||k==='type')?1:-1}; zonesView();});
+  $('#zt').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>goMap(+tr.dataset.z));
+  // routes
+  const band=BAND(h), rs=(D.routes[band]||[]).filter(r=>r[0]!==r[1]).slice(0,10), mx=rs.length?rs[0][2]:1;
+  $('#routesSub').textContent=`${band[0].toUpperCase()+band.slice(1)} band (${BANDTXT[band]}), all days, job 4 output`;
+  $('#routes').innerHTML=rs.map(r=>`<div class="route"><div>${zones[r[0]].name} → ${zones[r[1]].name}<div class="tr"><div class="fl" style="width:${(r[2]/mx*100).toFixed(1)}%"></div></div></div><div class="num" style="color:var(--muted);text-align:right">${fmtK(r[2])}<br><small>${(r[5]/Math.max(r[3],1)/60).toFixed(1)} min wait</small></div></div>`).join('');
+  // ranking
+  const rk=D.ranking.slice(0,12);
+  $('#rankT').innerHTML='<thead><tr><th>#</th><th>Area</th><th>When</th><th class="num">Index</th><th class="num">No driver</th><th class="num">Avg wait</th></tr></thead><tbody>'+
+    rk.map((r,i)=>`<tr data-z="${zones.findIndex(z=>z.name===r.zone)}" data-h="${r.hour}" data-d="${r.daytype}"><td style="color:var(--muted)">${i+1}</td><td>${r.zone}</td><td>${hh(r.hour)} ${r.daytype}</td><td class="num"><span class="idx" style="background:rgba(255,75,87,.18);color:#FF7A83">${r.index.toFixed(0)}</span></td><td class="num">${pct(r.nd_rate)}</td><td class="num">${r.wait.toFixed(1)} min</td></tr>`).join('')+'</tbody>';
+  $('#rankT').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{ if(state.rain){state.rain=false;$('#rainSw').setAttribute('aria-pressed',false);} setDt(DTN.indexOf(tr.dataset.d)); setHour(+tr.dataset.h); goMap(+tr.dataset.z); });
+}
+function goMap(z){ show('overview'); selectZone(z); if(mapApi) mapApi.focus(zones[z]); }
+
+/* ---------- wait view ---------- */
+let cNd,cDrv;
+function waitView(){
+  const dt=state.dt; let mn=1e9,mx=0; const M=[];
+  for(let z=0;z<NZ;z++){M[z]=[]; for(let h=0;h<24;h++){const s=sh(z,dt,h,2); const v=s?s[4]:null; M[z][h]=v; if(v!=null&&s[2]>=20){mn=Math.min(mn,v);mx=Math.max(mx,v);}}}
+  const order=[...Array(NZ).keys()].sort((a,b)=>M[b].reduce((x,y)=>x+(y||0),0)-M[a].reduce((x,y)=>x+(y||0),0));
+  const color=v=>{ if(v==null) return '#0E1C30'; const t=Math.max(0,Math.min(1,(v-mn)/(mx-mn))); const stops=[[23,147,196],[43,198,240],[255,181,71],[255,75,87]]; const p=t*3, i=Math.min(2,Math.floor(p)), f=p-i; const a=stops[i],b=stops[i+1]; return `rgb(${a.map((x,k)=>Math.round(x+(b[k]-x)*f)).join(',')})`; };
+  let html='<div class="hm"><div></div>'+H24.map((x,h)=>`<div class="hl">${h%3===0?h:''}</div>`).join('');
+  order.forEach(z=>{ html+=`<div class="rl">${zones[z].name}</div>`+M[z].map((v,h)=>`<div class="c" style="background:${color(v)}" data-z="${z}" data-h="${h}" title="${zones[z].name}, ${hh(h)}: ${v==null?'no data':v.toFixed(1)+' min'}"></div>`).join(''); });
+  $('#heat').innerHTML=html+'</div>';
+  $('#heatRange').textContent=`(${mn.toFixed(1)} – ${mx.toFixed(1)} min)`;
+  $('#heat').querySelectorAll('.c').forEach(c=>c.onclick=()=>{ setHour(+c.dataset.h); goMap(+c.dataset.z); });
+  // city-wide by hour
+  const ndS=[], drS=[];
+  for(let h=0;h<24;h++){ let r=0,n=0,d=0; for(let z=0;z<NZ;z++){const v=cell(z,dt,h,2); r+=v[0]; n+=v[2]; d+=v[6];} ndS.push(r?n/r*100:0); drS.push(r?d/r:0); }
+  const bar=(id,data,col,fmt)=>new Chart($(id),{type:'bar',data:{labels:H24,datasets:[{data,backgroundColor:data.map((v,i)=>col(v,i)),borderRadius:4}]},options:baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:t=>fmt(t.raw)}}}})});
+  if(cNd) cNd.destroy(); if(cDrv) cDrv.destroy();
+  const ndMax=Math.max(...ndS), drMax=Math.max(...drS);
+  cNd=bar('#cNd',ndS,v=>v>ndMax*.6?'#FF4B57':'#5B2E3E',v=>v.toFixed(1)+'% no driver');
+  cDrv=bar('#cDrv',drS,v=>v>drMax*.6?'#2BC6F0':'#1E4566',v=>v.toFixed(1)+' drivers nearby');
+}
+
+/* ---------- weather view ---------- */
+let wCharts=[];
+function weatherView(){
+  if(wCharts.length) return;
+  const wt=v=>v&&v[1]?v[4]/v[1]/60:null, nd=v=>v&&v[0]?v[2]/v[0]*100:null;
+  const line=(id,a,b,fmt)=>new Chart($(id),{type:'line',data:{labels:H24,datasets:[
+    {label:'Rain',data:a,borderColor:'#FF4B57',backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,'#FF4B57'),fill:true,tension:.35,pointRadius:2,borderWidth:2.5,glow:true,spanGaps:true},
+    {label:'Dry',data:b,borderColor:'#2BC6F0',tension:.35,pointRadius:2,borderWidth:2.5,spanGaps:true}]},
+    options:baseOpts({plugins:{legend:{display:true,labels:{boxWidth:10,boxHeight:10,usePointStyle:true}},tooltip:{callbacks:{label:t=>t.dataset.label+': '+fmt(t.raw)}}}})});
+  wCharts.push(line('#cRainWait',D.weather.rain.map(wt),D.weather.clear.map(wt),v=>v==null?'–':v.toFixed(1)+' min'));
+  wCharts.push(line('#cRainNd',D.weather.rain.map(nd),D.weather.clear.map(nd),v=>v==null?'–':v.toFixed(1)+'%'));
+  // festivals vs overall
+  const all=Object.values(D.yearly).reduce((a,v)=>a.map((x,i)=>x+v[i]));
+  const bw=all[4]/all[1]/60, bn=all[2]/all[0];
+  const NAMES={Pongal:'Pongal',Deepavali:'Deepavali',New_Year_Eve:'New Year’s Eve (5–11 PM)',Christmas:'Christmas',Ayudha_Pooja:'Ayudha Pooja',Vinayagar_Chathurthi:'Vinayagar Chathurthi',Tamil_New_Year:'Tamil New Year'};
+  const fs=Object.entries(D.festivals).map(([k,arr])=>{const t=arr.reduce((a,v)=>v?a.map((x,i)=>x+v[i]):a,[0,0,0,0,0,0,0,0,0,0]); return {k,t,nd:t[2]/t[0],w:t[4]/t[1]/60,l:t[5]/t[1]};}).sort((a,b)=>b.nd-a.nd);
+  const cmp=(v,b,lowGood)=>{const d=(v-b)/b; const bad=lowGood? d>0 : d<0; return `<span class="${bad?'down':'up'}">${d>=0?'+':''}${(d*100).toFixed(0)}%</span>`;};
+  $('#fests').innerHTML=fs.length? fs.map(f=>`<div class="fest"><h4>${NAMES[f.k]||f.k.replace(/_/g,' ')}</h4>
+    <div class="r">Requests<b>${fmtK(f.t[0])}</b></div>
+    <div class="r">No driver found<b>${pct(f.nd)} ${cmp(f.nd,bn,true)}</b></div>
+    <div class="r">Average wait<b>${f.w.toFixed(1)} min ${cmp(f.w,bw,true)}</b></div>
+    <div class="r">Waits over 10 min<b>${pct(f.l,0)}</b></div></div>`).join('') : '<div class="empty">No festival days in this data range.</div>';
+  // daily
+  const dl=D.daily;
+  wCharts.push(new Chart($('#cDaily'),{type:'line',data:{labels:dl.map(d=>d[0]),datasets:[
+    {label:'Requests',data:dl.map(d=>d[1]),borderColor:'#2BC6F0',backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,'#2BC6F0'),fill:true,pointRadius:0,borderWidth:1.4,tension:.2,yAxisID:'y'},
+    {label:'No driver %',data:dl.map(d=>d[3]/d[1]*100),borderColor:'#FF4B57',pointRadius:0,borderWidth:1.2,tension:.2,yAxisID:'y1'}]},
+    options:baseOpts({scales:{x:{grid:{display:false},ticks:{maxTicksLimit:12,callback:function(v){const s=this.getLabelForValue(v); return s.slice(0,7);}}},y:{beginAtZero:true,grid:{color:'#14263D'},ticks:{callback:v=>fmtK(v)}},y1:{position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>v+'%'}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:t=>t.dataset.label+': '+(t.datasetIndex?t.raw.toFixed(1)+'%':fmtInt(t.raw)),afterBody:t=>{const d=dl[t[0].dataIndex]; return d[5]>0?'Rain that day ('+fmtInt(d[5])+' requests in rain)':'';}}}}})}));
+}
+
+/* ---------- hadoop view ---------- */
+const JOBS=[
+  ['J1','Clean','Drops broken rows (bad GPS, negative fare, clock skew, truncated lines).','Map-only · counters'],
+  ['J2','Zone-hour stats','Requests, waits, no-driver and supply per area × hour × day type × weather.','Combiner'],
+  ['J3','Situations','Yearly, daily, monthly, rain and festival series. Seven keys per ride.','Combiner · multi-key'],
+  ['J4','Top routes','Origin → destination counts per time band, top destinations per origin.','Custom partitioner'],
+  ['J5','Shortage index','Scores every area-hour 0–100 and labels need / balanced / surplus.','Job chaining'],
+  ['J6','Hotspot ranking','Sorts all area-hours by shortage using the shuffle sort.','Total-order sort']
+];
+let hCharts=[];
+function hadoopView(){
+  const P=D.pipeline||[], B=D.benchmarks||[], src=D.meta.source;
+  $('#hadoopSub').textContent= src==='hadoop'? 'Real run on the Docker Hadoop cluster.' : 'This copy of the data came from a local test run (the same mapper and reducer scripts, joined with Unix pipes). Run the pipeline on the cluster to fill in real timings.';
+  $('#jobs').innerHTML=JOBS.map((j,i)=>{const r=P.find(p=>p.name.startsWith(j[0])); const c=r?r.counters:{};
+    return `<div class="job"><div class="n">Job ${i+1}</div><h4>${j[1]}</h4><span class="chip">${j[3]}</span><p>${j[2]}</p>
+    ${r?`<div class="k">Time<b>${r.seconds.toFixed(0)} s</b></div><div class="k">Map / reduce tasks<b>${c.map_tasks||0} / ${c.reduce_tasks||0}</b></div><div class="k">Records in<b>${fmtK(c.map_input_records||0)}</b></div><div class="k">Shuffle<b>${c.reduce_shuffle_bytes!=null?(c.reduce_shuffle_bytes/1048576).toFixed(1)+' MB':'—'}</b></div>
+      <div class="st ${r.ok?'':'no'}" style="margin-top:8px">${r.ok?'● Succeeded':'● Failed'}</div>`:`<div class="st no">Not run on the cluster yet</div>`}</div>`;}).join('');
+  const H=D.hdfs||{};
+  if(H.total_blocks){
+    const dn=H.datanodes||{}, ent=Object.entries(dn).sort(), mx=Math.max(1,...ent.map(e=>e[1].block_replicas||0));
+    $('#hdfs').innerHTML=`<div class="stats4"><div>Raw data<b>${(H.total_size_bytes/1073741824).toFixed(2)} GB</b></div><div>Files<b>${H.total_files}</b></div><div>Blocks (128 MB)<b>${H.total_blocks}</b></div><div>Replication<b>${H.avg_replication||H.default_replication}×</b></div></div>
+      <div style="padding:14px 0 18px">${ent.map(([k,v])=>`<div class="qrow"><span>${k}</span><span class="tr"><span class="fl" style="width:${((v.block_replicas||0)/mx*100).toFixed(1)}%;background:var(--cyan)"></span></span><span class="num" style="text-align:right">${v.block_replicas||0} blocks</span></div>`).join('')}
+      <div class="mini" style="padding:0 22px">File system status: ${H.status}. Every block is stored on ${H.default_replication} different DataNodes, so one worker can fail without losing data.</div></div>`;
+  } else {
+    const gb=D.meta.raw_bytes? (D.meta.raw_bytes/1073741824).toFixed(2)+' GB':'–';
+    $('#hdfs').innerHTML=`<div class="stats4"><div>Raw data<b>${gb}</b></div><div>Files<b>24</b></div><div>128 MB blocks (at least)<b>${D.meta.raw_bytes?Math.ceil(D.meta.raw_bytes/134217728):'–'}</b></div><div>Replication<b>2×</b></div></div><div class="empty">Block placement per DataNode appears after <code>generate_and_load.sh</code> runs on the cluster.</div>`;
+  }
+  const Q=D.quality||{}, bad=Object.entries(Q).filter(([k])=>!['ValidRows','Header','Empty'].includes(k)).sort((a,b)=>b[1]-a[1]), qm=Math.max(1,...bad.map(b=>b[1]));
+  const label={BadStatus:'Unknown status',NegativeFare:'Negative fare',PickupBeforeRequest:'Pickup before request',BadFieldCount:'Truncated row',BadCoords:'GPS outside city',MissingTrip:'Missing trip times',Unparseable:'Unreadable numbers'};
+  const totBad=bad.reduce((a,b)=>a+b[1],0);
+  $('#quality').innerHTML= Q.ValidRows? `<div class="stats4" style="grid-template-columns:1fr 1fr"><div>Valid rows kept<b>${fmtInt(Q.ValidRows)}</b></div><div>Rows dropped<b>${fmtInt(totBad)} (${pct(totBad/(Q.ValidRows+totBad),2)})</b></div></div><div style="padding:12px 0 18px">`+bad.map(([k,v])=>`<div class="qrow"><span>${label[k]||k}</span><span class="tr"><span class="fl" style="width:${(v/qm*100).toFixed(1)}%"></span></span><span class="num" style="text-align:right">${fmtInt(v)}</span></div>`).join('')+'</div>' : '<div class="empty">No counters yet.</div>';
+  hCharts.forEach(c=>c.destroy()); hCharts=[];
+  const ok=B.filter(b=>b.ok);
+  if(!ok.length){ $('#benchGrid').style.display='none'; const e=$('#benchEmpty'); e.style.display='block';
+    e.querySelector('.empty').innerHTML='Benchmarks have not been run on the cluster yet. Inside the master container run <code>bash /project/scripts/benchmark.sh</code> (about 15–25 minutes), then reload this page. It measures run time with 1, 2, 4 and 8 reducers, with the combiner on and off, and with 3, 6, 12 and 24 months of data.'; return; }
+  $('#benchGrid').style.display=''; $('#benchEmpty').style.display='none';
+  const red=ok.filter(b=>b.tag==='reducers').sort((a,b)=>a.reducers-b.reducers);
+  hCharts.push(new Chart($('#cRed'),{type:'bar',data:{labels:red.map(r=>r.reducers+' reducer'+(r.reducers>1?'s':'')),datasets:[{data:red.map(r=>r.seconds),backgroundColor:red.map((r,i)=>i===red.reduce((bi,x,j,a)=>x.seconds<a[bi].seconds?j:bi,0)?'#2BC6F0':'#1E4566'),borderRadius:6}]},
+    options:baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:t=>t.raw.toFixed(1)+' s'}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#14263D'},ticks:{callback:v=>v+'s'}}}})}));
+  const pair=(on,off)=>[ok.find(b=>b.name===on),ok.find(b=>b.name===off)];
+  const [j2on,j2off]=[ok.find(b=>b.tag==='reducers'&&b.reducers===4),ok.find(b=>b.name==='B combiner=off')], [j3on,j3off]=pair('B J3 combiner=on','B J3 combiner=off');
+  const mb=b=>b&&b.counters.reduce_shuffle_bytes!=null?b.counters.reduce_shuffle_bytes/1048576:null, sec=b=>b?b.seconds:null;
+  hCharts.push(new Chart($('#cComb'),{type:'bar',data:{labels:['Job 2','Job 3'],datasets:[
+    {label:'Combiner on',data:[mb(j2on),mb(j3on)],backgroundColor:'#2BC6F0',borderRadius:6,secs:[sec(j2on),sec(j3on)]},
+    {label:'Combiner off',data:[mb(j2off),mb(j3off)],backgroundColor:'#FF4B57',borderRadius:6,secs:[sec(j2off),sec(j3off)]}]},
+    options:baseOpts({interaction:{mode:'nearest',intersect:true},plugins:{legend:{display:true,labels:{boxWidth:10,boxHeight:10,usePointStyle:true}},tooltip:{callbacks:{label:t=>t.dataset.label+': '+(t.raw==null?'–':t.raw.toFixed(1)+' MB shuffled, '+(t.dataset.secs[t.dataIndex]||0).toFixed(0)+' s')}}},scales:{x:{grid:{display:false}},y:{type:'logarithmic',grid:{color:'#14263D'},title:{display:true,text:'MB, log scale'},ticks:{callback:v=>[0.1,1,10,100,1000,10000,100000].includes(v)?v+' MB':''}}}})}));
+  const sc=ok.filter(b=>b.tag==='scaling').map(b=>({m:+b.name.split('=')[1],s:b.seconds,r:b.counters.map_input_records||0})).sort((a,b)=>a.m-b.m);
+  hCharts.push(new Chart($('#cScale'),{type:'line',data:{labels:sc.map(s=>s.m+' mo'),datasets:[{data:sc.map(s=>s.s),borderColor:'#2BC6F0',backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,'#2BC6F0'),fill:true,tension:.3,pointRadius:5,pointBackgroundColor:'#2BC6F0',borderWidth:2.5,glow:true}]},
+    options:baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:t=>t.raw.toFixed(1)+' s for '+fmtK(sc[t.dataIndex].r)+' rows'}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#14263D'},ticks:{callback:v=>v+'s'}}}})}));
+}
+
+/* ---------- navigation ---------- */
+let current='overview';
+function show(v){
+  current=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
+  if(v!=='overview' && state.playing) $('#play').click();
+  refresh();
+  try{ localStorage.setItem('rp_view',v);}catch(e){}
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+
+function refresh(){
+  if(current==='overview'){ updateMarkers(); hourlyChart(); if(cHourly) cHourly.update('none'); waitBars(); if(state.zone!=null) selectZone(state.zone); }
+  else if(current==='zones') zonesView();
+  else if(current==='wait') waitView();
+  else if(current==='weather') weatherView();
+  else if(current==='hadoop') hadoopView();
+}
+
+kpis(); hadoopPanel(); initMap(); setHour(18);
+try{ const v=localStorage.getItem('rp_view'); if(v && v!=='overview' && document.getElementById('v-'+v)) show(v);}catch(e){}
+})();
+</script>
+</body>
+</html>

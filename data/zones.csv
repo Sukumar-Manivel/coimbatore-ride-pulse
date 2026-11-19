@@ -1,0 +1,31 @@
+zone,lat,lng,type,demand_weight,supply_ratio
+Gandhipuram,11.0183,76.9660,transit,10.0,0.72
+Town Hall,10.9937,76.9616,commercial,6.0,1.70
+RS Puram,11.0096,76.9500,commercial,7.0,1.80
+Ukkadam,10.9877,76.9606,transit,7.0,0.78
+Coimbatore Junction,10.9960,76.9670,transit,7.0,0.80
+Peelamedu,11.0275,77.0233,it_college,8.0,0.74
+Airport,11.0300,77.0434,airport,5.0,0.70
+Saravanampatti,11.0780,76.9980,it_college,8.0,0.72
+Singanallur,10.9988,77.0320,industrial,5.0,1.10
+Saibaba Colony,11.0230,76.9430,residential,4.0,1.90
+Hope College,11.0260,77.0120,it_college,5.0,1.00
+Race Course,11.0010,76.9790,commercial,4.0,1.85
+Ramanathapuram,10.9950,76.9930,residential,4.0,1.10
+Sundarapuram,10.9500,76.9700,residential,3.0,1.05
+Podanur,10.9670,76.9800,residential,3.0,1.00
+Kuniyamuthur,10.9600,76.9350,industrial,3.0,1.10
+Vadavalli,11.0250,76.9020,residential,3.5,1.70
+Thudiyalur,11.0800,76.9400,residential,3.0,1.00
+Ganapathy,11.0400,76.9700,industrial,4.5,1.05
+Kavundampalayam,11.0450,76.9450,residential,3.0,1.15
+Ondipudur,11.0000,77.0600,industrial,3.0,1.00
+Kovaipudur,10.9420,76.9300,residential,2.0,1.95
+Sitra,11.0400,77.0300,industrial,3.0,1.05
+Kalapatti,11.0730,77.0380,it_college,4.0,0.80
+Vilankurichi,11.0580,77.0170,it_college,3.0,0.95
+Lakshmi Mills,11.0080,76.9850,commercial,5.0,1.20
+Neelambur,11.0650,77.0880,it_college,3.0,0.78
+Perur,10.9750,76.9130,residential,1.5,1.40
+Selvapuram,10.9850,76.9420,residential,2.5,1.10
+Edayarpalayam,11.0320,76.9300,residential,2.5,1.20
